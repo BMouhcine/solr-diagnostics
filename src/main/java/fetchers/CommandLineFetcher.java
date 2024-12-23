@@ -38,11 +38,12 @@ public class CommandLineFetcher {
 		return output;
 	}
 	
-	public void writeError(String command, String errorFile){
+	public void writeError(String command, String errorFile, String solrServiceName){
 		try {
 			String output = "";
 		    String line;
-		    Process p = Runtime.getRuntime().exec(command);
+			String dockerExecCommand = String.format("docker exec %s %s", solrServiceName, command);
+		    Process p = Runtime.getRuntime().exec(dockerExecCommand);
 
 		    BufferedReader input = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 		    while ((line = input.readLine()) != null) {

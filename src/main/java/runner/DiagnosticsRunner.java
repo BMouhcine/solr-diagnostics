@@ -40,7 +40,14 @@ public class DiagnosticsRunner {
 		if (outputBaseDir == null) {
 			outputBaseDir = "/tmp";
 		}
-
+		String solrLogsSourceDir = cmd.getOptionValue("logsdir");
+		String solrDataSourceDir = cmd.getOptionValue("solrdatasourcedir");
+		String solrServiceName = cmd.getOptionValue("solrServiceName");
+		boolean useRootFlag = Boolean.parseBoolean(cmd.getOptionValue("runAsRoot"));
+		String useDockerRootPrivileges = "";
+		if (useRootFlag) {
+			useDockerRootPrivileges = "-u root";
+		}
 		System.out.println("Gathering info...");
 
 		OutputWriter writer = new OutputWriter(outputBaseDir);
@@ -55,6 +62,8 @@ public class DiagnosticsRunner {
 		//saving the ps output because we'll need it later to detect Solr's command line
 		String ps = commandLineFetcher.fetch("ps ax", "psax.txt");
 
+		commandLineFetcher.fetch(String.format("docker exec %s ps ax", solrServiceName), String.format("psax_%s.txt", solrServiceName));
+
 		System.out.println("* dmesg output");
 		commandLineFetcher.fetch("dmesg -Tx", "dmesg.txt");
 
@@ -63,12 +72,15 @@ public class DiagnosticsRunner {
 
 		System.out.println("* sysctl output");
 		commandLineFetcher.fetch("sysctl -a", "sysctl.txt");
+		commandLineFetcher.fetch(String.format("docker exec %s %s sysctl -a", useDockerRootPrivileges, solrServiceName), String.format("sysctl_docker_%s.txt", solrServiceName));
 
 		System.out.println("* uname output");
 		commandLineFetcher.fetch("uname -a", "uname.txt");
+		commandLineFetcher.fetch(String.format("docker exec %s %s uname -a", useDockerRootPrivileges, solrServiceName), String.format("uname_docker_%s.txt", solrServiceName));
 
 		System.out.println("* top output (this should take a bit)");
 		commandLineFetcher.fetch("top -H -n3 -b", "top.txt");
+		commandLineFetcher.fetch(String.format("docker exec %s %s top -H -n3 -b", useDockerRootPrivileges, solrServiceName), String.format("top_docker_%s.txt", solrServiceName));
 
 		if (cmd.hasOption("getVarLog")) {
 			String varLogDestination = outputDir + File.separator + "var_log";
@@ -89,8 +101,8 @@ public class DiagnosticsRunner {
 		SolrStuffFetcher solrFetcher = new SolrStuffFetcher(writer, solrCmdLine);
 
 		if (!cmd.hasOption("noSolrLogs")) {
-			solrFetcher.fetchLogs();
-			solrFetcher.fetchGCLogs();
+			solrFetcher.fetchLogs(solrLogsSourceDir);
+			solrFetcher.fetchGCLogs(solrLogsSourceDir);
 		}
 
 		System.out.println("* /proc/SolrPID/limits output");
@@ -99,13 +111,13 @@ public class DiagnosticsRunner {
 
 		System.out.println("* java version (for the Solr process)");
 		String javaPath = getJavaPath(solrCmdLine);
-		commandLineFetcher.writeError(javaPath + " -version", "java_version.txt");
+		commandLineFetcher.writeError(javaPath + " -version", "java_version.txt", solrServiceName);
 
-		solrFetcher.fetchSolrXML();
+		solrFetcher.fetchSolrXML(solrDataSourceDir);
 
 		SolrAddress solrAddress = getSolrAddress(solrCmdLine);
 		String binSolr = solrFetcher.getBinSolr();
-		
+
 		HTTPFetcher httpFetcher = new HTTPFetcher(solrAddress,
 				solrFetcher.getSolrSSL(),
 				cmd.getOptionValue("user"),
@@ -120,6 +132,7 @@ public class DiagnosticsRunner {
 		if (solrAddress.isCloud()){
 			System.out.println("--> Found zkHost or zkRun in the command line - assuming SolrCloud");
 			if (binSolr != null) {
+				binSolr = String.format("docker exec %s %s", solrServiceName, binSolr);
 				//run bin/solr zk cp -r zk:/configs THAT DIR THAT WE CREATED -z localhost:9983
 				String configLocation = "zk:/configs";
 				System.out.println("* Copying configsets from " + configLocation + " to " + configLocalLocation);
@@ -127,6 +140,8 @@ public class DiagnosticsRunner {
 							+ " zk cp -r " + configLocation + " " + configLocalLocation
 							+ " -z " + solrAddress.getZkAddress(),
 						"zk_cp_outerr.out");
+				String dockerCpConfigCmd = String.format("docker cp %s:%s %s", solrServiceName, configLocalLocation, configLocalLocation);
+				commandLineFetcher.fetch(dockerCpConfigCmd, "docker_cp_zk_config.out");
 			} else {
 				System.out.println("Couldn't find bin/solr. Maybe -Dsolr.install.dir isn't present?");
 			}
@@ -258,6 +273,23 @@ public class DiagnosticsRunner {
                 .desc( "Where to write the diagnostics files. A timestamp-based directory will be created there. Defaults to /tmp" )
                 .hasArg(true)
                 .build());
+		options.addOption(Option.builder("logsdir")
+				.desc( "Specify Solr logs source directory.")
+				.hasArg(true)
+				.build());
+		options.addOption(Option.builder("solrdatasourcedir")
+				.desc( "Specify Solr data source directory.")
+				.hasArg(true)
+				.build());
+		options.addOption(Option.builder("solrServiceName")
+				.desc( "Specify Solr Service Name (docker)")
+				.hasArg(true)
+				.build());
+		options.addOption(Option.builder("runAsRoot")
+				.desc( "Whether to run docker exec commands using root privileges")
+				.hasArg(true)
+				.build());
+
 		options.addOption(Option.builder("user")
                 .desc( "username for basic authentication" )
                 .hasArg(true)

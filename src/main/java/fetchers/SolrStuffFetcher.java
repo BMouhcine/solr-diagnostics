@@ -46,16 +46,23 @@ public class SolrStuffFetcher {
 				return true;
 			}
 		} catch (Exception e){
-			e.printStackTrace();
+			System.out.println("Could not find a match for expression: \\-Dsolr\\.solr\\.home=(.*?) (No SSL)");
+			//e.printStackTrace();
 		}
 		return false;
 	}
 
-	public void fetchSolrXML() {
+	public void fetchSolrXML(String solrDataSourceDir) {
 		String outputDir = writer.getOutputDir();
 		File solrHome;
+		String solrHomePath = "";
 		try {
-			solrHome = new File(getSolrHome());
+			if (solrDataSourceDir != null && !solrDataSourceDir.isEmpty()) {
+				solrHomePath = solrDataSourceDir;
+			} else {
+				solrHomePath = getSolrHome();
+			}
+			solrHome = new File(solrHomePath);
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			return;
@@ -69,7 +76,7 @@ public class SolrStuffFetcher {
 		}
 	}
 
-	public void fetchGCLogs() {
+	public void fetchGCLogs(String solrLogsSourceDir) {
 		String outputDir = writer.getOutputDir();
 		String solrLogsOutputDir = outputDir + File.separator + "logs";
 
@@ -83,7 +90,12 @@ public class SolrStuffFetcher {
 
 		File GCLog;
 		try {
-			GCLog = new File(getParamRegex("\\-Xloggc:(.*?) "));
+			//String gcSourceLogsDir = getParamRegex("\\-Xloggc:(.*?) ");
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+		try {
+			GCLog = new File(solrLogsSourceDir);
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			return;
@@ -109,7 +121,7 @@ public class SolrStuffFetcher {
 		}
 	}
 
-	public void fetchLogs() {
+	public void fetchLogs(String solrLogsSourceDir) {
 		String outputDir = writer.getOutputDir();
 		String solrLogsOutputDir = outputDir + File.separator + "logs";
 
@@ -119,7 +131,7 @@ public class SolrStuffFetcher {
 		}
 
 		try {
-			solrLogsSourceDir = getParamRegex("\\-Dsolr\\.log\\.dir=(.*?) ");
+			//solrLogsSourceDir = getParamRegex("\\-Dsolr\\.log\\.dir=(.*?) ");
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			return;

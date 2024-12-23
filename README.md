@@ -32,6 +32,17 @@ By default, solr-diagnostics will try to get all Solr logs. You can skip this by
 
 You can pass (basic) authentication credentials by adding `-user my_user` and `-pass my_pass`.
 
+**Example cmd line:**
+
+```bash
+sudo java -jar <jar-path> \
+-outputdir <result-output-dir> \ 
+-logsdir <solr-logs-dir> \
+-solrdatasourcedir <solr-data-dir> \
+-solrServiceName <docker-solr-service-name>
+```
+
+
 # Build from sources
 Clone the repository, then run:
 
@@ -39,3 +50,4 @@ Clone the repository, then run:
 The self-contained Jar will be `target/com.sematext.solr-diagnostics-x.y.z-SNAPSHOT.jar`
 # Roadmap/TODO
 See the list of [issues](https://github.com/sematext/solr-diagnostics/issues), and feel free to report new ones or submit pull requests!
+
